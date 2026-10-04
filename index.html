@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kas, Transfer & Laporan Keuangan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen pb-16">
+
+    <header class="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-20 flex justify-between items-center no-print">
+        <h1 class="text-xs font-bold tracking-wide">📊 Keuangan & Laporan Cetak</h1>
+        <div class="flex space-x-2">
+            <button onclick="window.print()" class="text-[11px] bg-blue-600 px-3 py-1 rounded-full text-white font-bold active:scale-95 transition shadow">🖨️ Cetak Laporan</button>
+            <button onclick="refreshData()" id="syncBtn" class="text-[11px] bg-slate-800 px-2.5 py-1 rounded-full text-slate-300 active:scale-95 transition">🔄 Sinkron</button>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto p-3 space-y-4">
+
+        <div class="print-only text-center space-y-1 mb-4 pb-3 border-b-2 border-slate-800">
+            <h1 class="text-lg font-bold uppercase">Laporan Keuangan Bulanan</h1>
+            <p id="printPeriod" class="text-xs text-slate-600">Periode: Bulan Ini</p>
+        </div>
+
+        <!-- 📈 LAPORAN KEUANGAN UTAMA -->
+        <section class="bg-gradient-to-br from-slate-900 to-blue-950 text-white p-4 rounded-2xl shadow-lg space-y-3">
+            <div class="flex justify-between items-center no-print">
+                <span class="text-xs font-semibold text-blue-300">Laporan Bulanan</span>
+                <input type="month" id="filterMonth" class="bg-white/10 text-white text-xs px-2 py-1 rounded-lg border border-white/20 outline-none">
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <div class="bg-white/10 p-2.5 rounded-xl backdrop-blur-md">
+                    <span class="text-[10px] text-emerald-300 block">Total Pemasukan</span>
+                    <span id="repIncome" class="text-xs font-bold">Rp 0</span>
+                </div>
+                <div class="bg-white/10 p-2.5 rounded-xl backdrop-blur-md">
+                    <span class="text-[10px] text-rose-300 block">Total Pengeluaran</span>
+                    <span id="repExpense" class="text-xs font-bold">Rp 0</span>
+                </div>
+            </div>
+
+            <div class="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl flex justify-between items-center text-xs">
+                <span class="text-amber-300">⏳ Total Terencana (Pending):</span>
+                <span id="repPlanned" class="font-bold text-amber-200">Rp 0</span>
+            </div>
+
+            <div class="pt-2 border-t border-white/15 flex justify-between items-center text-xs">
+                <span class="opacity-80">Sisa Saldo Bersih Bulanan:</span>
+                <span id="repBalance" class="text-sm font-extrabold text-emerald-400">Rp 0</span>
+            </div>
+        </section>
+
+        <!-- 👛 SALDO PER DOMPET / AKUN -->
+        <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/60">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">Saldo Masing-Masing Dompet / Bank</h2>
+            <div id="walletSummary" class="grid grid-cols-2 gap-2 text-xs"></div>
+        </section>
+
+        <!-- 📝 FORM TAMBAH -->
+        <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/60 no-print">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Tambah Transaksi / Tarik Tunai / Transfer</h2>
+            
+            <form id="kasForm" class="space-y-2.5">
+                <div class="grid grid-cols-2 gap-2">
+                    <select id="type" onchange="toggleFormMode()" class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Income">🟢 Pemasukan</option>
+                        <option value="Expense" selected>🔴 Pengeluaran</option>
+                        <option value="Transfer">🔄 Tarik Tunai / Pindah Saldo</option>
+                    </select>
+                    <input type="date" id="date" required class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label id="labelAccount" class="block text-[11px] font-medium text-slate-500 mb-1">Sumber Uang (Dari Akun)</label>
+                    <select id="account" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Tunai">💵 Tunai (Cash)</option>
+                        <option value="GoPay">🟢 GoPay</option>
+                        <option value="DANA">🔵 DANA</option>
+                        <option value="Seabank">🟠 Seabank</option>
+                        <option value="BRI">🟦 M-Banking BRI</option>
+                        <option value="Mandiri">🟡 M-Banking Mandiri</option>
+                    </select>
+                </div>
+
+                <div id="targetAccountContainer" class="hidden">
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Masuk Ke Akun Tujuan (Penerima)</label>
+                    <select id="targetAccount" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Tunai">💵 Tunai (Cash)</option>
+                        <option value="GoPay">🟢 GoPay</option>
+                        <option value="DANA">🔵 DANA</option>
+                        <option value="Seabank">🟠 Seabank</option>
+                        <option value="BRI">🟦 M-Banking BRI</option>
+                        <option value="Mandiri">🟡 M-Banking Mandiri</option>
+                    </select>
+                </div>
+                
+                <div id="categoryContainer">
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Kategori</label>
+                    <input type="text" id="category" placeholder="Contoh: Gaji, Bensin, Listrik" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Nominal (Rp)</label>
+                    <input type="number" id="amount" placeholder="Nominal tanpa titik" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div id="plannedContainer" class="space-y-1.5">
+                    <div class="flex items-center space-x-2 py-1 px-1 bg-amber-50 rounded-xl border border-amber-200">
+                        <input type="checkbox" id="isPlanned" class="w-4 h-4 text-amber-600 rounded">
+                        <label for="isPlanned" class="text-xs text-amber-900 font-medium">Jadikan Transaksi Terencana (Pending)</label>
+                    </div>
+                    <div id="deductPlannedContainer" class="pl-1">
+                        <label class="text-[11px] text-blue-700 font-semibold cursor-pointer flex items-center space-x-2">
+                            <input type="checkbox" id="deductPlanned" class="w-3.5 h-3.5 text-blue-600 rounded">
+                            <span>Potong dari anggaran terencana dengan nama kategori yang sama</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Catatan</label>
+                    <input type="text" id="notes" placeholder="Catatan opsional..." class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <button type="submit" id="btnSubmit" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-xs shadow-md shadow-blue-500/30 active:scale-[0.97] transition">
+                    Simpan Transaksi ⚡
+                </button>
+            </form>
+        </section>
+
+        <!-- 🕒 RIWAYAT PER AKUN (2 TABEL: PEMASUKAN & PENGELUARAN) -->
+        <section class="space-y-3">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Rincian Histori Berdasarkan Akun</h2>
+            <div id="accountHistoryContainer" class="space-y-3">
+                <div class="text-xs text-slate-400 text-center py-4">Memuat data...</div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
