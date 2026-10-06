@@ -1,6 +1,5 @@
-
 // GANTI DENGAN URL WEB APP GOOGLE APPS SCRIPT ANDA
-const API_URL = "https://script.google.com/macros/s/AKfycbwchMXWh0taQupnBpPaxZLSDXKLnQGY8nWWXEFDF5NKOOjzWxc9xD9EA-8RnuY5RYQ/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyepYsydUKeI0zGrlAnXRHXjxtrz7_QETslmZzQepHvocyVlOHIYgemXOpFajjHvTCTOw/exec";
 
 let globalData = [];
 
@@ -86,9 +85,9 @@ function renderApp() {
     let totalExpense = 0;
     let totalPlanned = 0;
     let walletBalances = {};
-    let walletMonthlyStats = {}; // Statistik masuk/keluar per akun sesuai bulan yang dipilih
+    let walletMonthlyStats = {}; 
 
-    // 1. Hitung saldo keseluruhan dompet dari SEMUA data (akumulasi saldo real)
+    // 1. Hitung saldo keseluruhan dompet dari SEMUA data
     globalData.forEach(item => {
         let amt = parseFloat(item.Amount) || 0;
         let type = String(item.Type).toLowerCase();
@@ -109,7 +108,7 @@ function renderApp() {
         }
     });
 
-    // 2. Hitung statistik Masuk & Keluar per Akun HANYA untuk bulan yang sedang dipilih
+    // 2. Hitung statistik Masuk & Keluar per Akun sesuai bulan yang dipilih
     filteredTransactions.forEach(item => {
         let amt = parseFloat(item.Amount) || 0;
         let type = String(item.Type).toLowerCase();
@@ -127,15 +126,12 @@ function renderApp() {
                 walletMonthlyStats[acc].expense += amt;
             }
         } else if (type.includes("transfer")) {
-            // Transfer keluar dari akun sumber dihitung sebagai mutasi keluar bulan ini
             walletMonthlyStats[acc].expense += amt;
-            // Transfer masuk ke akun tujuan dihitung sebagai mutasi masuk bulan ini
             if (targetAcc) {
                 walletMonthlyStats[targetAcc].income += amt;
             }
         }
 
-        // Hitung total laporan bulanan utama
         if (type.includes("income")) {
             totalIncome += amt;
         } else if (type.includes("expense")) {
@@ -149,7 +145,6 @@ function renderApp() {
 
     let netBalance = totalIncome - totalExpense;
 
-    // Tampilkan ke kartu laporan utama
     document.getElementById("repIncome").textContent = `Rp ${totalIncome.toLocaleString('id-ID')}`;
     document.getElementById("repExpense").textContent = `Rp ${totalExpense.toLocaleString('id-ID')}`;
     document.getElementById("repPlanned").textContent = `Rp ${totalPlanned.toLocaleString('id-ID')}`;
@@ -192,11 +187,10 @@ function renderApp() {
         });
     }
 
-    // 4. Render Histori Per Akun
     renderAccountHistory(filteredTransactions);
 }
 
-// Render Rincian Histori Berdasarkan Akun
+// Render Rincian Histori Berdasarkan Akun (Dilengkapi Tombol Hapus)
 function renderAccountHistory(transactions) {
     const container = document.getElementById("accountHistoryContainer");
     container.innerHTML = "";
@@ -233,18 +227,26 @@ function renderAccountHistory(transactions) {
             let isIncome = type.includes("income");
             let isTransfer = type.includes("transfer");
             let target = item.TargetAccount ? ` ➡️ ${item.TargetAccount}` : "";
+            let trxId = item.ID || item.id || "";
             
             let sign = isIncome ? "+" : (isTransfer ? "🔄" : "-");
             let colorClass = isIncome ? "text-emerald-600 bg-emerald-50" : (isTransfer ? "text-blue-600 bg-blue-50" : "text-rose-600 bg-rose-50");
 
             htmlCard += `
-                <div class="flex justify-between items-center p-2 rounded-xl bg-slate-50/70 text-xs">
-                    <div>
-                        <div class="font-semibold text-slate-800">${item.Category || item.Notes || 'Transaksi'} ${target}</div>
+                <div class="flex justify-between items-center p-2 rounded-xl bg-slate-50/70 text-xs gap-2">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-slate-800 truncate">${item.Category || item.Notes || 'Transaksi'} ${target}</div>
                         <div class="text-[10px] text-slate-400">${cleanDate} ${item.Notes ? '• ' + item.Notes : ''}</div>
                     </div>
-                    <div class="font-bold ${colorClass} px-2 py-1 rounded-lg">
-                        ${sign} Rp ${amt.toLocaleString('id-ID')}
+                    <div class="flex items-center gap-2">
+                        <div class="font-bold ${colorClass} px-2 py-1 rounded-lg whitespace-nowrap">
+                            ${sign} Rp ${amt.toLocaleString('id-ID')}
+                        </div>
+                        <button onclick="deleteTransaction('${trxId}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors" title="Hapus Transaksi">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </button>
                     </div>
                 </div>
             `;
@@ -252,6 +254,36 @@ function renderAccountHistory(transactions) {
 
         htmlCard += `</div></div>`;
         container.innerHTML += htmlCard;
+    }
+}
+
+// Fungsi Hapus Transaksi (Frontend & Google Spreadsheet)
+async function deleteTransaction(id) {
+    if (!id) {
+        alert("ID transaksi tidak valid.");
+        return;
+    }
+    
+    if (!confirm("Apakah Anda yakin ingin menghapus transaksi ini? Data akan terhapus permanen dari Google Spreadsheet.")) {
+        return;
+    }
+
+    try {
+        let response = await fetch(API_URL, {
+            method: "POST",
+            body: JSON.stringify({ action: "delete", id: id })
+        });
+
+        let result = await response.json();
+        if (result.status === "success") {
+            alert("Transaksi berhasil dihapus!");
+            await refreshData();
+        } else {
+            throw new Error(result.message || "Gagal menghapus.");
+        }
+    } catch (error) {
+        console.error("Gagal hapus:", error);
+        alert("Terjadi kesalahan: " + error.message);
     }
 }
 
